@@ -1,11 +1,18 @@
 # pip install pyqt5
 import sys
+import schedule, time
+import threading
+
 from PyQt5 import QtCore, QtWidgets, QtGui
 
 
 class MyApp(QtWidgets.QMainWindow):
+    instance: None
+    __tick: float = 1
+
     def __init__(self):
         super(MyApp, self).__init__()
+        self.bLoop = True
 
         # toggle
         self.toggle_buttton: QtWidgets.QPushButton
@@ -28,6 +35,10 @@ class MyApp(QtWidgets.QMainWindow):
         self.button_height = 0
 
         self.__init_ui()
+
+        # loop thread
+        self.__th = None
+
         self.show()
 
     def __init_ui(self):
@@ -87,6 +98,11 @@ class MyApp(QtWidgets.QMainWindow):
         self.window_height = self.height()
         self.__set_button_position()
 
+    def closeEvent(self, a0: QtGui.QCloseEvent) -> None:
+        MyApp.instance.bLoop = False
+        MyApp.instance.__th.join()
+        super(MyApp, self).closeEvent()
+
     # show normal window
     def __set_normal_window(self):
         self.move(self.posX, self.posY)
@@ -117,11 +133,46 @@ class MyApp(QtWidgets.QMainWindow):
         return self.bTransparentFlag
 
     @staticmethod
-    def run():
+    def run(tick_callback):
         app = QtWidgets.QApplication(sys.argv)
-        myApp = MyApp()
+        MyApp.instance = MyApp()
+
+        # scheduling...
+        # call func per second
+        MyApp.instance.__th = threading.Thread(target=MyApp.background_update, args=(tick_callback,))
+        MyApp.instance.__th.start()
+
         sys.exit(app.exec_())
 
-app = QtWidgets.QApplication(sys.argv)
-myApp = MyApp()
-sys.exit(app.exec_())
+    @staticmethod
+    def background_update(tick_callback):
+        interval_sec = 1
+        schedule.every(interval_sec).seconds.do(tick_callback)
+        while MyApp.instance.bLoop:
+            schedule.run_pending()
+            time.sleep(interval_sec)
+        print('loop end')
+
+    @staticmethod
+    def loop_stop():
+        MyApp.instance.bLoop = False
+
+
+def test_print():
+    print('hello')
+
+
+if __name__ == '__main__':
+
+    bflag = 0
+    while bflag < 10:
+        schedule.run_pending()
+        bflag = bflag + 1
+        time.sleep(1)
+    print('end')
+
+    MyApp.run(test_print)
+
+# app = QtWidgets.QApplication(sys.argv)
+# myApp = MyApp()
+# sys.exit(app.exec_())
